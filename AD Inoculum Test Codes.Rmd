@@ -1,0 +1,325 @@
+---
+title: "AD Inoculum Test Codes"
+author: "Hezhou (Jenny) Ding"
+date: '2022-05-17'
+output: html_document
+---
+This file demonstrates the generations of the graphs in the manuscript. This file uses bacterial data as an example for how we generated the relative abundance graph and beta diversity graph, as well as how we ran PERMANOVA on the beta diversity. The file also shows how we calculated alpha diversity using the prokyryotic genus data. The generations of graphs for archaea genus are not shown here becasue it essentially shares the same process as bacterial data.
+
+## Load Libraries
+```{r, message=FALSE, results='hide'}
+library(ggplot2)
+library(dplyr)
+library(plyr)
+```
+
+
+# Bacteria
+```{r,echo=FALSE}
+setwd("C:\\Users\\Jenny Ding\\Documents\\Research\\Data\\2020 Feb AD Prelim Project\\DNA Results\\Downstream DNA results\\1Publish to Github")
+```
+
+```{r}
+bac.genus.data <- read.csv("bacteria genus.csv", check.names = FALSE)
+```
+## Relative Abundance
+### Slice the top 10-15 genus by each treatment group's
+```{r}
+t1 <- bac.genus.data %>% slice_max(`0-F-T-A-1`, n=10)
+t2 <- bac.genus.data %>% slice_max(`0-F-T-A-2`, n=10)
+t3 <- bac.genus.data %>% slice_max(`0-F-T-1`, n=10)
+t4 <- bac.genus.data %>% slice_max(`0-F-T-2`, n=10)
+t5 <- bac.genus.data %>% slice_max(`0-F-A-1`, n=10)
+t6 <- bac.genus.data %>% slice_max(`0-F-A-2`, n=10)
+t7 <- bac.genus.data %>% slice_max(`24-F-T-A-1`, n=10)
+t8  <-bac.genus.data %>% slice_max(`24-F-T-A-2`, n=10)
+t9 <- bac.genus.data %>% slice_max(`24-F-T-1`, n=10)
+t10 <- bac.genus.data %>% slice_max(`24-F-T-2`, n=10)
+t11 <- bac.genus.data %>% slice_max(`24-F-A-1`, n=10)
+t12 <- bac.genus.data %>% slice_max(`24-F-A-2`, n=10)
+```
+
+### Subset the targeted treatment group from each sorted sheet
+```{r}
+t1a <- select(t1,`Genus`,`0-F-T-A-1`)
+t2a <- select(t2, `Genus`, `0-F-T-A-2`)
+t3a <- select(t3, `Genus`, `0-F-T-1`)
+t4a <- select(t4, `Genus`, `0-F-T-2`)
+t5a <- select(t5, `Genus`, `0-F-A-1`)
+t6a <- select(t6, `Genus`, `0-F-A-2`)
+t7a <- select(t7, `Genus`, `24-F-T-A-1`)
+t8a <- select(t8, `Genus`, `24-F-T-A-2`)
+t9a <- select(t9, `Genus`, `24-F-T-1`)
+t10a <- select(t10, `Genus`, `24-F-T-2`)
+t11a <- select(t11, `Genus`, `24-F-A-1`)
+t12a <- select(t12, `Genus`, `24-F-A-2`)
+```
+
+### Combine the selected column using full join function in plyr
+```{r}
+bac.genus.top10 <- plyr::join_all(list(t1a,t2a,t3a,t4a,t5a,t6a,t7a,t8a,t9a,t10a,t11a,t12a),
+                           by = "Genus", type = "full")
+# Remove NA
+bac.genus.top10[is.na(bac.genus.top10)] <- 0
+
+# Generate "Others"
+colSums(bac.genus.top10[,2:13]) # Sum of each column
+Others <- 1- colSums(bac.genus.top10[,2:13]) # Others = 1-(sum of the members)
+bac.genus.top10[32,2:13] <- Others; bac.genus.top10[32,1]<- "1Others" # Give it a name
+```
+### Plot the relative abundance
+```{r}
+# Reshape the data frame to long form so it can be used for ggplot
+library(reshape2)
+genus_melted <- melt(bac.genus.top10,id=("Genus"))
+theme_set(theme_bw())
+# Add a column for time of the samples
+cbind(genus_melted,Time=c(0))
+# Give values
+genus_melted[193:384,"Time"]="Day24"; genus_melted[1:192,"Time"]="Day0";
+# Map values into axis labels using mapvalues from plyr package and then group on that 
+genus_melted$variable <- mapvalues(genus_melted$variable, 
+                                   c('0-F-T-A-1','0-F-T-A-2',"0-F-T-1", "0-F-T-2","0-F-A-1", 
+                                     "0-F-A-2","24-F-T-A-1","24-F-T-A-2","24-F-T-1", "24-F-T-2",
+                                     "24-F-A-1", "24-F-A-2"),
+                                   c("F-T-A-1","F-T-A-2","F-T-1", "F-T-2", "F-A-1", 
+                                     "F-A-2","F-T-A-1","F-T-A-2","F-T-1", "F-T-2", "F-A-1", 
+                                     "F-A-2"))
+
+# Plot the stacked bar chart
+## Pull the genus names
+Genus.name <- sort(bac.genus.top10[,1])
+Genus.name[Genus.name == "1Others"] <- "Others"
+
+theme_set(theme_bw())
+p <- ggplot(genus_melted, aes(fill=Genus, y=value, x=variable)) + 
+  geom_bar(position="stack", stat="identity",color = "black", width=0.7) +
+  labs(x="",y="Relative abundance") + 
+  theme(axis.text.y = element_text(size=10),axis.text.x = element_text(angle=-90,size=10,margin = margin(t = 2, unit = "pt")), 
+        axis.title.y = element_text(size=10, margin = margin(r = 20, unit = "pt")),
+        legend.text = element_text(size=8, face = "italic"), legend.title = element_text(size=10),
+        panel.border = element_rect(size = 1.2)) +
+  scale_fill_manual(labels=as.factor(Genus.name),
+                    values=c("#caf0f8","#0077b6","#4a4e69", "#ced4da","#bb3e03","#f4f1de","#fb8500","#ff8fa3",
+                             "#ccd5ae","#606c38","#8c2f39","#419d78","#5e60ce","#dc2f02","#fcbf49","#bdb2ff",
+                             "#5aa9e6","#757bc8","#fee440","#a5be00","#7b2cbf","#d88c9a","#feeafa","#588b8b",
+                             "#b23a48","#3d5a80","#00b4d8", "#f2cc8f","#eb5e28","#6d597a","#b5e48c","#90a8c3",
+                             "#ff477e","#ffffff"))
+
+# Use FACET function to separate graphs
+p + facet_grid(cols = vars(Time), scales="free") +
+  theme(strip.text.x = element_text(size = 10),
+        strip.background = element_rect(size = 1.2))
+
+# Save graph
+# ggsave("Bacteria.RA.png", plot = last_plot(), path = "", 
+#        width = 13, height = 7, device='png', dpi=700)
+```
+
+## Beta Diversity
+```{r, message=FALSE, results='hide'}
+library(vegan)
+library(ggplot2)
+library(ggforce)
+```
+
+### Calculate distances and PCoA
+```{r}
+bac.genus.data=read.csv("bacteria genus.csv", check.names = FALSE, row.names = 1) 
+
+# Transferring data frame to data matrix
+bac.genus.matrix = data.matrix(bac.genus.data)
+
+# Calculate Bray-Curtis dissimilarity matrix (many other beta distance models to choose)
+beta.dist = vegdist(t(bac.genus.matrix), method = "bray", na.rm = TRUE)
+
+# Calculate PCoA or so called MDS (very confusing stats analysis)
+pcoa.data=cmdscale(beta.dist, eig=TRUE,x.ret=FALSE)
+pcoa.var=round(pcoa.data$eig/sum(pcoa.data$eig)*100,1)
+
+# Converting data to ggplot format
+pcoa.value = pcoa.data$points
+Sample <- c("F-T-A","F-T-A","F-T","F-T","F-A","F-A","F-T-A","F-T-A","F-T","F-T","F-A","F-A")
+X <- as.numeric(pcoa.value[,1])
+Y <- as.numeric(pcoa.value[,2])
+pcoa.df1 <- data.frame(Sample, X, Y)
+
+# Give values                      
+cbind(pcoa.df1,Time=c(0))
+pcoa.df1[1:6,"Time"]="Day0"; pcoa.df1[7:12,"Time"]="Day24";
+pcoa.df1
+```
+
+### Plot
+```{r}
+theme_set(theme_bw())
+ggplot(data=pcoa.df1, aes(x=X, y=Y))+
+  geom_point(size=7,aes(shape=Sample, fill=Time),stroke=1.5)+
+  scale_shape_manual(values = c(21, 22, 24) ) +
+  scale_fill_manual(values = c("#f3722c","#90be6d"))+
+  guides(fill = guide_legend(override.aes = list(shape = 21) ),
+         shape = guide_legend(override.aes = list(fill = "black")))+
+  #ellipse are used for visualization. could do "type" for distribution, or level, etc.
+  theme(axis.text.y = element_text(size=16), axis.text.x = element_text(size=16),
+        axis.title.x = element_text(size=18, margin = margin(t = 20, unit = "pt")),
+        axis.title.y = element_text(size=18, margin = margin(r = 20, unit = "pt")),
+        legend.text = element_text(size=12), legend.title = element_text(size=16), legend.key.size = unit(1, "cm"),
+        panel.border = element_rect(size = 1.2)) +
+  coord_fixed(xlim = c(-0.68,0.5),ylim = c(-0.4,0.55)) +
+  xlab(paste("PCoA1 - ", pcoa.var[1], "%", sep=""))+
+  ylab(paste("PCoA2 - ", pcoa.var[2], "%", sep = ""))+
+  ggtitle("Bacterial Beta Diversity") + theme(plot.title = element_text(size = 20,margin = margin(b = 10, unit = "pt")))+ 
+  geom_mark_ellipse(aes(fill = Time))
+
+#Save file
+# ggsave("Bacteria.beta.png", plot = last_plot(), path = "", 
+#        width = 8, height = 8, device='png', dpi=700)
+
+```
+## PERMANOVA for Beta Diversity
+#### Groups the treatments to Day0 and Day24-first 6 is day0, second 6 is day 24.
+```{r, message=FALSE, results='hide'}
+library(RRPP)
+```
+
+### We can use two methods for PERMANOVA
+```{r}
+# Import metadata
+SAM <- read.csv("metadata.csv", row.names = 1)
+```
+#### Method1
+```{r}
+groups <- factor(c(rep("Day0", 6), rep("Day24", 6)))
+genus.adonis <- adonis(beta.dist ~ groups, permutations = 999, method = "bray") 
+print(genus.adonis)
+```
+
+#### Method2 
+```{r}
+otu.rrpp.d <- RRPP::lm.rrpp(beta.dist ~ Day,
+                            data=SAM, SS.type="III", 
+                            print.progress = FALSE, 
+                            seed="random", 
+                            iter=999)
+anova(otu.rrpp.d, effect.type = "F")
+```
+
+# Prokaryotes
+## Alpha Diversity
+```{r, echo=FALSE}
+setwd("C:\\Users\\Jenny Ding\\Documents\\Research\\Data\\2020 Feb AD Prelim Project\\DNA Results\\Downstream DNA results\\1Publish to Github")
+```
+
+```{r, message=FALSE, results='hide'}
+library(phyloseq)
+library(vegan)
+```
+### We can use two methods
+#### Method 1: Use phyloseq
+```{r}
+pro.genus.data <- read.csv("prokaryote genus counts.csv", check.names = FALSE, row.names = 1) 
+ASV <- pro.genus.data
+row.names(ASV) <- paste0("ASV", 1:297)
+
+Genus <- row.names(pro.genus.data)
+taxa <- data.frame(Genus)
+row.names(taxa) <- row.names(ASV)
+
+# phyloseq only accept counts
+ps <- phyloseq(otu_table(ASV, taxa_are_rows = TRUE),
+               tax_table(as.matrix(taxa)))
+
+alpha <- phyloseq::estimate_richness(ps, split=TRUE, measures=c("Observed", "Chao1", "Shannon", "Simpson")) 
+row.names(alpha) <- colnames(ASV)
+alpha <- alpha[-1,]
+alpha
+```
+
+#### Method 2: Use Vegan
+```{r}
+# Vegan accepts compositional data
+diversity(t(pro.genus.data), index = "shannon")
+diversity(t(pro.genus.data), index = "simpson")
+```
+
+### ANOVA for alpha diversity
+```{r}
+alpha.ano <- alpha
+Treatment <- c("F_T_A_0","F_T_A_0","F_T_0","F_T_0","F_A_0","F_A_0","F_T_A_24","F_T_A_24","F_T_24","F_T_24","F_A_24","F_A_24")
+alpha.ano[,6] <- Treatment
+alpha.ano.0 <- alpha.ano [1:6,]
+alpha.ano.24 <- alpha.ano [7:12,]
+```
+
+```{r}
+## ANOVA and psot HOC for day 0
+library(agricolae)
+ANOVA_CHAO=aov(Chao1~V6, data=alpha.ano.0)
+summary(ANOVA_CHAO)
+Tukey_CHAO=TukeyHSD(ANOVA_CHAO)
+Tukey_CHAO
+HSD.test(ANOVA_CHAO, "V6", group=T)$groups 
+
+ANOVA_SHAN=aov(Shannon~V6, data=alpha.ano.0)
+summary(ANOVA_SHAN)
+Tukey_SHAN=TukeyHSD(ANOVA_SHAN)
+Tukey_SHAN
+HSD.test(ANOVA_SHAN, "V6", group=T)$groups 
+
+ANOVA_SIM=aov(Simpson~V6, data=alpha.ano.0)
+summary(ANOVA_SIM)
+Tukey_SIM=TukeyHSD(ANOVA_SIM)
+Tukey_SIM
+HSD.test(ANOVA_SIM, "V6", group=T)$groups
+
+## ANOVA and psot HOC for day 24
+library(agricolae)
+ANOVA_CHAO=aov(Chao1~V6, data=alpha.ano.24)
+summary(ANOVA_CHAO)
+Tukey_CHAO=TukeyHSD(ANOVA_CHAO)
+Tukey_CHAO
+HSD.test(ANOVA_CHAO, "V6", group=T)$groups 
+
+ANOVA_SHAN=aov(Shannon~V6, data=alpha.ano.24)
+summary(ANOVA_SHAN)
+Tukey_SHAN=TukeyHSD(ANOVA_SHAN)
+Tukey_SHAN
+HSD.test(ANOVA_SHAN, "V6", group=T)$groups 
+
+ANOVA_SIM=aov(Simpson~V6, data=alpha.ano.24)
+summary(ANOVA_SIM)
+Tukey_SIM=TukeyHSD(ANOVA_SIM)
+Tukey_SIM
+HSD.test(ANOVA_SIM, "V6", group=T)$groups  
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
